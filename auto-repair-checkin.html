@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vehicle Service Check-In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;800&family=Noto+Sans+SC:wght@400;500;700;800&family=Noto+Sans+Bengali:wght@400;500;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#14181C;
+    --steel:#1C2B39;
+    --steel-2:#26394A;
+    --paper:#EAEEF0;
+    --card:#FFFFFF;
+    --yellow:#F2B705;
+    --yellow-ink:#4a3400;
+    --red:#C1443C;
+    --green:#2E7D6B;
+    --line:#D7DADD;
+    --font-display:'Noto Sans','Noto Sans SC','Noto Sans Bengali',sans-serif;
+    --font-body:'Noto Sans','Noto Sans SC','Noto Sans Bengali',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);}
+  body{
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:0 0 40px;
+  }
+  .app{width:100%;max-width:460px;min-height:100vh;background:var(--paper);display:flex;flex-direction:column;}
+
+  /* top bar */
+  .topbar{
+    background:var(--steel);
+    color:#fff;
+    padding:18px 20px 16px;
+    position:sticky;top:0;z-index:20;
+  }
+  .brand{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  .brand h1{font-family:var(--font-display);font-weight:800;font-size:1.15rem;margin:0;letter-spacing:.2px;}
+  .brand p{margin:2px 0 0;font-size:.75rem;color:#B9C4CC;font-weight:500;}
+  .lang-switch{display:flex;gap:6px;margin-top:14px;}
+  .lang-pill{
+    flex:1;
+    font-family:var(--font-body);
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.18);
+    color:#E7ECEF;
+    border-radius:999px;
+    padding:7px 4px;
+    font-size:.8rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s,color .15s,transform .1s;
+  }
+  .lang-pill:hover{background:rgba(255,255,255,.16);}
+  .lang-pill:active{transform:scale(.97);}
+  .lang-pill.active{background:var(--yellow);color:var(--yellow-ink);border-color:var(--yellow);}
+
+  /* progress */
+  .progress{display:flex;align-items:center;gap:6px;padding:16px 20px 0;}
+  .progress .step{display:flex;align-items:center;gap:8px;flex:1;}
+  .progress .dot{
+    width:24px;height:24px;border-radius:50%;
+    background:var(--card);border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:.7rem;font-weight:600;color:#8a9299;
+    flex-shrink:0;
+  }
+  .progress .label{font-size:.72rem;font-weight:600;color:#8a9299;white-space:nowrap;}
+  .progress .bar{flex:1;height:2px;background:var(--line);}
+  .progress .step.current .dot,.progress .step.done .dot{background:var(--steel);border-color:var(--steel);color:#fff;}
+  .progress .step.current .label,.progress .step.done .label{color:var(--steel);}
+  .progress .step.done .bar,.progress .bar.done{background:var(--steel);}
+
+  main{flex:1;padding:22px 20px 30px;}
+  .screen{display:none;animation:fade .25s ease;}
+  .screen.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  @media (prefers-reduced-motion: reduce){.screen{animation:none;}.tag-swing{animation:none !important;}}
+
+  /* tag card - signature element */
+  .tag-card{
+    position:relative;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:0 8px 22px rgba(20,24,28,.08);
+    padding:34px 22px 26px;
+    margin-top:18px;
+  }
+  .tag-card::before{
+    content:'';
+    position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+    width:22px;height:22px;border-radius:50%;
+    background:var(--steel);
+    box-shadow:inset 0 0 0 5px var(--paper), 0 2px 5px rgba(0,0,0,.25);
+  }
+  .tag-card::after{
+    content:'';
+    position:absolute;top:1px;left:16px;right:16px;
+    border-top:2px dashed var(--line);
+  }
+  .tag-swing{animation:swing 1.1s ease-out;transform-origin:top center;}
+  @keyframes swing{
+    0%{transform:rotate(-4deg);}
+    30%{transform:rotate(3deg);}
+    55%{transform:rotate(-1.5deg);}
+    75%{transform:rotate(.8deg);}
+    100%{transform:rotate(0);}
+  }
+
+  h2.screen-title{font-family:var(--font-display);font-weight:800;font-size:1.3rem;margin:0 0 4px;}
+  .screen-sub{color:#5b6570;font-size:.9rem;margin:0 0 4px;line-height:1.45;}
+
+  .qr-box{display:flex;justify-content:center;padding:20px 0 10px;}
+  .qr-box canvas,.qr-box img{border-radius:8px;}
+  .hint{text-align:center;font-size:.78rem;color:#8a9299;margin-top:8px;}
+
+  .btn{
+    width:100%;
+    border:none;border-radius:10px;
+    padding:14px 16px;
+    font-family:var(--font-body);
+    font-weight:700;
+    font-size:.95rem;
+    cursor:pointer;
+    transition:transform .1s, filter .15s;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--yellow);color:var(--yellow-ink);}
+  .btn-primary:hover{filter:brightness(1.05);}
+  .btn-ghost{background:transparent;color:var(--steel);border:1.5px solid var(--line);margin-top:10px;}
+  .btn-row{display:flex;gap:10px;margin-top:18px;}
+  .btn-row .btn-ghost{margin-top:0;flex:0 0 90px;}
+  .btn-row .btn-primary{flex:1;}
+
+  /* form */
+  .section{margin-top:22px;}
+  .section:first-child{margin-top:6px;}
+  .section-title{
+    font-family:var(--font-display);font-weight:700;font-size:.85rem;
+    text-transform:uppercase;letter-spacing:.06em;color:var(--steel);
+    display:flex;align-items:center;gap:8px;margin-bottom:12px;
+  }
+  .section-title::after{content:'';flex:1;height:1px;background:var(--line);}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:.82rem;font-weight:600;margin-bottom:6px;color:#333;}
+  .field label .opt{font-weight:500;color:#9aa1a7;text-transform:none;}
+  .field label .req{color:var(--red);margin-left:2px;}
+  .field input,.field select,.field textarea{
+    width:100%;
+    border:1.5px solid var(--line);
+    border-radius:8px;
+    padding:11px 12px;
+    font-family:var(--font-body);
+    font-size:.92rem;
+    background:var(--card);
+    color:var(--ink);
+  }
+  .field input:focus,.field select:focus,.field textarea:focus{
+    outline:none;border-color:var(--steel);box-shadow:0 0 0 3px rgba(28,43,57,.12);
+  }
+  .field.mono input{font-family:var(--font-mono);letter-spacing:.5px;}
+  .field textarea{min-height:80px;resize:vertical;}
+  .field.invalid input,.field.invalid select,.field.invalid textarea{border-color:var(--red);box-shadow:0 0 0 3px rgba(193,68,60,.12);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .checkline{display:flex;gap:10px;align-items:flex-start;margin-top:6px;}
+  .checkline input{width:18px;height:18px;margin-top:2px;flex-shrink:0;}
+  .checkline label{font-size:.82rem;color:#444;line-height:1.4;}
+  .error-banner{
+    background:#FBEBE9;border:1px solid var(--red);color:#8a2f28;
+    border-radius:8px;padding:10px 12px;font-size:.82rem;font-weight:600;
+    margin-bottom:14px;display:none;
+  }
+  .error-banner.show{display:block;}
+
+  /* confirmation ticket */
+  .ticket-id{
+    font-family:var(--font-mono);font-weight:600;font-size:1.6rem;letter-spacing:1px;
+    background:var(--steel);color:var(--yellow);text-align:center;
+    padding:14px 10px;border-radius:8px;margin:14px 0 18px;
+  }
+  .summary-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.86rem;}
+  .summary-row:last-child{border-bottom:none;}
+  .summary-row .k{color:#8a9299;flex-shrink:0;}
+  .summary-row .v{text-align:right;font-weight:600;}
+  .done-mark{
+    width:46px;height:46px;border-radius:50%;background:var(--green);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 6px;
+  }
+  .done-mark svg{width:24px;height:24px;}
+
+  /* photos */
+  .photo-btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;border:1.5px dashed var(--line);border-radius:10px;
+    background:var(--card);color:var(--steel);
+    padding:12px;font-family:var(--font-body);font-weight:600;font-size:.88rem;
+    cursor:pointer;transition:border-color .15s,background .15s;
+  }
+  .photo-btn:hover{border-color:var(--steel);background:#F4F6F7;}
+  .photo-btn svg{width:18px;height:18px;flex-shrink:0;}
+  .photo-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+  .photo-thumb{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid var(--line);flex-shrink:0;}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-thumb .remove{
+    position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;
+    background:rgba(20,24,28,.72);color:#fff;border:none;font-size:.85rem;line-height:1;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  }
+  .photo-count{font-size:.76rem;color:#8a9299;margin-top:6px;}
+  .summary-photos{margin-top:10px;}
+  .summary-photos .photo-grid{margin-top:8px;}
+  .summary-photos .photo-thumb{width:56px;height:56px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div>
+        <h1 data-i18n="appTitle">Vehicle Service Check-In</h1>
+        <p data-i18n="appSubtitle">Auto Repair Registration</p>
+      </div>
+    </div>
+    <div class="lang-switch">
+      <button class="lang-pill active" data-lang="en">EN</button>
+      <button class="lang-pill" data-lang="zh">中文</button>
+      <button class="lang-pill" data-lang="bn">বাংলা</button>
+    </div>
+  </div>
+
+  <div class="progress">
+    <div class="step current" data-step="1">
+      <div class="dot">1</div>
+      <span class="label" data-i18n="progressScan">Scan</span>
+    </div>
+    <div class="bar" id="bar1"></div>
+    <div class="step" data-step="2">
+      <div class="dot">2</div>
+      <span class="label" data-i18n="progressDetails">Details</span>
+    </div>
+    <div class="bar" id="bar2"></div>
+    <div class="step" data-step="3">
+      <div class="dot">3</div>
+      <span class="label" data-i18n="progressDone">Done</span>
+    </div>
+  </div>
+
+  <main>
+    <!-- SCREEN 1: SCAN -->
+    <section class="screen active" id="screen1">
+      <h2 class="screen-title" data-i18n="step1Title">Check in your vehicle</h2>
+      <p class="screen-sub" data-i18n="step1Sub">Scan this code with your phone camera to start, or tap the button below.</p>
+
+      <div class="tag-card tag-swing">
+        <div class="qr-box"><div id="qrcode"></div></div>
+        <button class="btn btn-primary" id="toFormBtn" data-i18n="step1Btn">Open check-in form</button>
+        <p class="hint" data-i18n="step1Hint">No app needed — this opens right in your browser.</p>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: FORM -->
+    <section class="screen" id="screen2">
+      <h2 class="screen-title" data-i18n="step2Title">Tell us about your visit</h2>
+      <div class="error-banner" id="errorBanner" data-i18n="requiredError">Please complete the highlighted fields.</div>
+
+      <form id="checkinForm">
+        <div class="section">
+          <div class="section-title" data-i18n="sectionContact">Your contact info</div>
+          <div class="field" data-field="ownerName">
+            <label data-i18n="labelName">Full name<span class="req">*</span></label>
+            <input type="text" name="ownerName" required>
+          </div>
+          <div class="row2">
+            <div class="field" data-field="phone">
+              <label data-i18n="labelPhone">Phone number<span class="req">*</span></label>
+              <input type="tel" name="phone" required>
+            </div>
+            <div class="field" data-field="email">
+              <label data-i18n="labelEmail">Email <span class="opt" data-i18n="optionalTag">(optional)</span></label>
+              <input type="email" name="email">
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title" data-i18n="sectionVehicle">Vehicle information</div>
+          <div class="row2">
+            <div class="field" data-field="make">
+              <label data-i18n="labelMake">Make<span class="req">*</span></label>
+              <input type="text" name="make" required>
+            </div>
+            <div class="field" data-field="model">
+              <label data-i18n="labelModel">Model<span class="req">*</span></label>
+              <input type="text" name="model" required>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field" data-field="year">
+              <label data-i18n="labelYear">Year</label>
+              <input type="number" name="year" min="1950" max="2027">
+            </div>
+            <div class="field mono" data-field="plate">
+              <label data-i18n="labelPlate">License plate<span class="req">*</span></label>
+              <input type="text" name="plate" class="plate-input" required>
+            </div>
+          </div>
+          <div class="row2">
+            <div class="field mono" data-field="vin">
+              <label data-i18n="labelVin">VIN <span class="opt" data-i18n="optionalTag">(optional)</span></label>
+              <input type="text" name="vin">
+            </div>
+            <div class="field" data-field="mileage">
+              <label data-i18n="labelMileage">Current mileage</label>
+              <input type="number" name="mileage" min="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title" data-i18n="sectionService">Service request</div>
+          <div class="field" data-field="serviceType">
+            <label data-i18n="labelServiceType">Service needed<span class="req">*</span></label>
+            <select name="serviceType" id="serviceType" required></select>
+          </div>
+          <div class="field" data-field="issue">
+            <label data-i18n="labelIssue">Describe the issue<span class="req">*</span></label>
+            <textarea name="issue" class="issue-input" required></textarea>
+          </div>
+          <div class="field">
+            <label data-i18n="labelPhotos">Photos <span class="opt" data-i18n="optionalTag">(optional)</span></label>
+            <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+            <button type="button" class="photo-btn" id="photoBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .9-.55l.6-1.2A1 1 0 0 1 9.6 3.7h4.8a1 1 0 0 1 .9.55l.6 1.2a1 1 0 0 0 .9.55H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2"/></svg>
+              <span data-i18n="addPhotoBtn">Add photos</span>
+            </button>
+            <p class="photo-count" id="photoCount"></p>
+            <div class="photo-grid" id="photoGrid"></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title" data-i18n="sectionDropoff">Drop-off details</div>
+          <div class="row2">
+            <div class="field" data-field="dropoffDate">
+              <label data-i18n="labelDate">Drop-off date<span class="req">*</span></label>
+              <input type="date" name="dropoffDate" required>
+            </div>
+            <div class="field" data-field="dropoffTime">
+              <label data-i18n="labelTime">Drop-off time</label>
+              <input type="time" name="dropoffTime">
+            </div>
+          </div>
+          <div class="checkline">
+            <input type="checkbox" name="consent" id="consent">
+            <label for="consent" data-i18n="consentLabel">I agree to receive a diagnostic estimate before any repair work begins.</label>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" id="backBtn" data-i18n="backBtn">Back</button>
+          <button type="submit" class="btn btn-primary" data-i18n="submitBtn">Submit check-in</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- SCREEN 3: CONFIRMATION -->
+    <section class="screen" id="screen3">
+      <div class="tag-card tag-swing">
+        <div class="done-mark">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5l5 5L20 7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h2 class="screen-title" style="text-align:center" data-i18n="step3Title">You're checked in</h2>
+        <p class="screen-sub" style="text-align:center" data-i18n="step3Sub">Show this ticket number at the front desk.</p>
+        <div class="ticket-id" id="ticketId">AR-000000</div>
+        <div class="section-title" data-i18n="summaryTitle" style="margin-top:4px">Summary</div>
+        <div id="summaryBox"></div>
+        <div class="summary-photos" id="summaryPhotos"></div>
+        <button class="btn btn-primary" id="newCheckinBtn" style="margin-top:18px" data-i18n="newCheckinBtn">Start another check-in</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const dict = {
+  en: {
+    appTitle:"Vehicle Service Check-In", appSubtitle:"Auto Repair Registration",
+    progressScan:"Scan", progressDetails:"Details", progressDone:"Done",
+    step1Title:"Check in your vehicle", step1Sub:"Scan this code with your phone camera to start, or tap the button below.",
+    step1Btn:"Open check-in form", step1Hint:"No app needed — this opens right in your browser.",
+    step2Title:"Tell us about your visit",
+    sectionContact:"Your contact info", sectionVehicle:"Vehicle information", sectionService:"Service request", sectionDropoff:"Drop-off details",
+    labelName:"Full name", labelPhone:"Phone number", labelEmail:"Email", labelPlate:"License plate", labelMake:"Make",
+    labelModel:"Model", labelYear:"Year", labelVin:"VIN", labelMileage:"Current mileage", labelServiceType:"Service needed",
+    labelIssue:"Describe the issue", labelDate:"Drop-off date", labelTime:"Drop-off time",
+    labelPhotos:"Photos",
+    optionalTag:"(optional)",
+    serviceOptions:{oilChange:"Oil change", brakes:"Brakes", tires:"Tires", diagnostic:"Diagnostic / check engine light",
+      battery:"Battery / electrical", ac:"A/C or heating", bodywork:"Bodywork / collision", other:"Other"},
+    consentLabel:"I agree to receive a diagnostic estimate before any repair work begins.",
+    requiredError:"Please complete the highlighted fields.",
+    submitBtn:"Submit check-in", backBtn:"Back",
+    step3Title:"You're checked in", step3Sub:"Show this ticket number at the front desk.",
+    ticketLabel:"Ticket No.", summaryTitle:"Summary", newCheckinBtn:"Start another check-in",
+    issuePlaceholder:"e.g. Grinding noise when braking", platePlaceholder:"e.g. ABC-1234",
+    addPhotoBtn:"Add photos", photoCountLabel:"photo(s) attached", removePhotoAria:"Remove photo",
+    photosSummary:"Photos"
+  },
+  zh: {
+    appTitle:"车辆维修登记", appSubtitle:"汽车维修登记",
+    progressScan:"扫码", progressDetails:"填写信息", progressDone:"完成",
+    step1Title:"为您的车辆办理登记", step1Sub:"用手机摄像头扫描此二维码开始，或点击下方按钮。",
+    step1Btn:"打开登记表", step1Hint:"无需下载应用 — 直接在浏览器中打开。",
+    step2Title:"请填写您的信息",
+    sectionContact:"联系方式", sectionVehicle:"车辆信息", sectionService:"维修需求", sectionDropoff:"送车信息",
+    labelName:"姓名", labelPhone:"电话号码", labelEmail:"电子邮箱", labelPlate:"车牌号", labelMake:"品牌",
+    labelModel:"型号", labelYear:"年份", labelVin:"车辆识别码 (VIN)", labelMileage:"当前里程", labelServiceType:"所需服务",
+    labelIssue:"问题描述", labelDate:"送车日期", labelTime:"送车时间",
+    labelPhotos:"照片",
+    optionalTag:"（选填）",
+    serviceOptions:{oilChange:"机油更换", brakes:"刹车系统", tires:"轮胎", diagnostic:"故障诊断 / 检查引擎灯",
+      battery:"电瓶 / 电路系统", ac:"空调 / 暖气", bodywork:"车身钣金 / 事故维修", other:"其他"},
+    consentLabel:"我同意在维修开始前先收到故障诊断报价。",
+    requiredError:"请填写标记的必填项。",
+    submitBtn:"提交登记", backBtn:"返回",
+    step3Title:"登记完成", step3Sub:"请在前台出示此登记编号。",
+    ticketLabel:"登记编号", summaryTitle:"登记摘要", newCheckinBtn:"新建登记",
+    issuePlaceholder:"例如：刹车时有摩擦声", platePlaceholder:"例如：京A12345",
+    addPhotoBtn:"添加照片", photoCountLabel:"张照片已添加", removePhotoAria:"删除照片",
+    photosSummary:"照片"
+  },
+  bn: {
+    appTitle:"গাড়ি সার্ভিস চেক-ইন", appSubtitle:"অটো মেরামত নিবন্ধন",
+    progressScan:"স্ক্যান", progressDetails:"তথ্য", progressDone:"সম্পন্ন",
+    step1Title:"আপনার গাড়ি চেক-ইন করুন", step1Sub:"শুরু করতে আপনার ফোনের ক্যামেরা দিয়ে এই কোডটি স্ক্যান করুন, অথবা নিচের বাটনে চাপুন।",
+    step1Btn:"চেক-ইন ফর্ম খুলুন", step1Hint:"কোনো অ্যাপের প্রয়োজন নেই — এটি সরাসরি আপনার ব্রাউজারে খুলবে।",
+    step2Title:"আপনার তথ্য জানান",
+    sectionContact:"যোগাযোগের তথ্য", sectionVehicle:"গাড়ির তথ্য", sectionService:"সার্ভিসের প্রয়োজন", sectionDropoff:"গাড়ি জমা দেওয়ার তথ্য",
+    labelName:"পূর্ণ নাম", labelPhone:"ফোন নম্বর", labelEmail:"ইমেইল", labelPlate:"লাইসেন্স প্লেট", labelMake:"ব্র্যান্ড",
+    labelModel:"মডেল", labelYear:"মডেল বছর", labelVin:"ভিআইএন (VIN)", labelMileage:"বর্তমান মাইলেজ", labelServiceType:"প্রয়োজনীয় সার্ভিস",
+    labelIssue:"সমস্যার বিবরণ দিন", labelDate:"জমা দেওয়ার তারিখ", labelTime:"জমা দেওয়ার সময়",
+    labelPhotos:"ছবি",
+    optionalTag:"(ঐচ্ছিক)",
+    serviceOptions:{oilChange:"ইঞ্জিন অয়েল পরিবর্তন", brakes:"ব্রেক", tires:"টায়ার", diagnostic:"ডায়াগনস্টিক / চেক ইঞ্জিন লাইট",
+      battery:"ব্যাটারি / ইলেকট্রিক্যাল", ac:"এসি / হিটিং", bodywork:"বডি ওয়ার্ক / দুর্ঘটনা মেরামত", other:"অন্যান্য"},
+    consentLabel:"মেরামতের কাজ শুরু হওয়ার আগে আমি একটি ডায়াগনস্টিক খরচের হিসাব পেতে সম্মত আছি।",
+    requiredError:"চিহ্নিত ঘরগুলো পূরণ করুন।",
+    submitBtn:"চেক-ইন জমা দিন", backBtn:"পেছনে",
+    step3Title:"আপনার চেক-ইন সম্পন্ন হয়েছে", step3Sub:"সামনের ডেস্কে এই টিকিট নম্বরটি দেখান।",
+    ticketLabel:"টিকিট নম্বর", summaryTitle:"সারসংক্ষেপ", newCheckinBtn:"নতুন চেক-ইন শুরু করুন",
+    issuePlaceholder:"যেমন: ব্রেক করার সময় ঘষার শব্দ", platePlaceholder:"যেমন: ঢাকা মেট্রো-গ ১২-৩৪৫৬",
+    addPhotoBtn:"ছবি যুক্ত করুন", photoCountLabel:"টি ছবি যুক্ত করা হয়েছে", removePhotoAria:"ছবি মুছুন",
+    photosSummary:"ছবি"
+  }
+};
+
+let lang = 'en';
+let photos = []; // {name, dataUrl}
+const MAX_PHOTOS = 8;
+
+function renderPhotos(){
+  const t = dict[lang];
+  const grid = document.getElementById('photoGrid');
+  grid.innerHTML = photos.map((p, i) => `
+    <div class="photo-thumb">
+      <img src="${p.dataUrl}" alt="${p.name}">
+      <button type="button" class="remove" data-idx="${i}" aria-label="${t.removePhotoAria}">&times;</button>
+    </div>
+  `).join('');
+  const countEl = document.getElementById('photoCount');
+  countEl.textContent = photos.length ? `${photos.length} ${t.photoCountLabel}` : '';
+  grid.querySelectorAll('.remove').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      photos.splice(parseInt(btn.getAttribute('data-idx')), 1);
+      renderPhotos();
+    });
+  });
+}
+
+document.getElementById('photoBtn').addEventListener('click', ()=>{
+  document.getElementById('photoInput').click();
+});
+
+document.getElementById('photoInput').addEventListener('change', (e)=>{
+  const files = Array.from(e.target.files).slice(0, MAX_PHOTOS - photos.length);
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = () => {
+      photos.push({name: file.name, dataUrl: reader.result});
+      renderPhotos();
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+});
+
+function applyLang(){
+  const t = dict[lang];
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    if(t[key] !== undefined) el.textContent = t[key];
+  });
+  document.querySelector('.issue-input').placeholder = t.issuePlaceholder;
+  document.querySelector('.plate-input').placeholder = t.platePlaceholder;
+
+  const sel = document.getElementById('serviceType');
+  const prevValue = sel.value;
+  sel.innerHTML = '';
+  const placeholderOpt = document.createElement('option');
+  placeholderOpt.value = ''; placeholderOpt.disabled = true; placeholderOpt.selected = !prevValue;
+  placeholderOpt.textContent = '—';
+  sel.appendChild(placeholderOpt);
+  Object.entries(t.serviceOptions).forEach(([key,label])=>{
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = label;
+    if(key === prevValue) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  document.querySelectorAll('.lang-pill').forEach(p=>{
+    p.classList.toggle('active', p.getAttribute('data-lang') === lang);
+  });
+
+  renderPhotos();
+}
+
+document.querySelectorAll('.lang-pill').forEach(p=>{
+  p.addEventListener('click', ()=>{ lang = p.getAttribute('data-lang'); applyLang(); });
+});
+
+// QR code
+new QRCode(document.getElementById('qrcode'), {
+  text: window.location.href.startsWith('file:') ? 'https://example-autoshop.com/checkin' : window.location.href,
+  width: 168, height: 168,
+  colorDark: '#1C2B39', colorLight: '#ffffff'
+});
+
+// navigation
+function setProgress(step){
+  document.querySelectorAll('.progress .step').forEach(s=>{
+    const n = parseInt(s.getAttribute('data-step'));
+    s.classList.remove('current','done');
+    if(n < step) s.classList.add('done');
+    if(n === step) s.classList.add('current');
+  });
+  document.getElementById('bar1').classList.toggle('done', step > 1);
+  document.getElementById('bar2').classList.toggle('done', step > 2);
+}
+function showScreen(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen'+n).classList.add('active');
+  setProgress(n);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+document.getElementById('toFormBtn').addEventListener('click', ()=> showScreen(2));
+document.getElementById('backBtn').addEventListener('click', ()=> showScreen(1));
+
+const requiredFields = ['ownerName','phone','make','model','plate','serviceType','issue','dropoffDate'];
+
+document.getElementById('checkinForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const form = e.target;
+  let firstInvalid = null;
+  let hasError = false;
+
+  requiredFields.forEach(name=>{
+    const input = form.elements[name];
+    const wrap = form.querySelector('[data-field="'+name+'"]');
+    const empty = !input.value || !input.value.trim();
+    wrap.classList.toggle('invalid', empty);
+    if(empty){ hasError = true; if(!firstInvalid) firstInvalid = input; }
+  });
+
+  document.getElementById('errorBanner').classList.toggle('show', hasError);
+  if(hasError){ firstInvalid.focus(); return; }
+
+  const t = dict[lang];
+  const data = Object.fromEntries(new FormData(form).entries());
+  const now = new Date();
+  const ticketId = 'AR-' + now.getFullYear().toString().slice(2) +
+    String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') +
+    '-' + Math.floor(1000 + Math.random()*9000);
+
+  document.getElementById('ticketId').textContent = ticketId;
+
+  const rows = [
+    [t.labelName, data.ownerName],
+    [t.labelPhone, data.phone],
+    [t.labelMake + ' / ' + t.labelModel, [data.make, data.model, data.year].filter(Boolean).join(' ')],
+    [t.labelPlate, data.plate],
+    [t.labelServiceType, t.serviceOptions[data.serviceType] || data.serviceType],
+    [t.labelDate, data.dropoffDate + (data.dropoffTime ? ' ' + data.dropoffTime : '')]
+  ];
+  document.getElementById('summaryBox').innerHTML = rows
+    .filter(r=>r[1])
+    .map(r=>`<div class="summary-row"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`)
+    .join('');
+
+  const photoSummaryEl = document.getElementById('summaryPhotos');
+  if(photos.length){
+    photoSummaryEl.innerHTML = `<div class="summary-row"><span class="k">${t.photosSummary}</span><span class="v">${photos.length} ${t.photoCountLabel}</span></div>
+      <div class="photo-grid">${photos.map(p=>`<div class="photo-thumb"><img src="${p.dataUrl}" alt="${p.name}"></div>`).join('')}</div>`;
+  } else {
+    photoSummaryEl.innerHTML = '';
+  }
+
+  showScreen(3);
+});
+
+document.getElementById('newCheckinBtn').addEventListener('click', ()=>{
+  document.getElementById('checkinForm').reset();
+  document.querySelectorAll('.field.invalid').forEach(f=>f.classList.remove('invalid'));
+  document.getElementById('errorBanner').classList.remove('show');
+  photos = [];
+  renderPhotos();
+  showScreen(1);
+});
+
+applyLang();
+</script>
+</body>
+</html>
